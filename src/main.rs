@@ -6,6 +6,7 @@ use crate::game::GameContainer;
 
 mod game;
 mod resources;
+mod drawing;
 
 const APP_ID: &str = "leben-gui-chess";
 const AUTHOR: &str = "Leonard Bengtsson";
