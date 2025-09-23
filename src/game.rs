@@ -1,12 +1,27 @@
 use ggez::event;
 use ggez::graphics;
 use ggez::input::keyboard::KeyInput;
+use rsoderh_chess::{FinishedGame, Game};
+use crate::resources::{Resources};
+use crate::drawing;
+use crate::drawing::colors::*;
 
-pub struct GameContainer {}
+enum GameState {
+    OngoingGame(Game),
+    FinishedGame(FinishedGame),
+}
+
+pub struct GameContainer {
+    resources: Resources,
+    game_state: GameState,
+}
 
 impl GameContainer {
     pub fn new(ctx: &mut ggez::Context) -> ggez::GameResult<GameContainer> {
-        Ok(GameContainer {})
+        Ok(GameContainer {
+            resources: Resources::new(ctx)?,
+            game_state: GameState::OngoingGame(Game::new_standard()),
+        })
     }
 }
 
@@ -16,10 +31,14 @@ impl event::EventHandler for GameContainer {
     }
 
     fn draw(&mut self, ctx: &mut ggez::Context) -> ggez::GameResult {
-        let background_color = graphics::Color::from_rgb(30, 30, 30);
-        let mut canvas = graphics::Canvas::from_frame(
-            ctx, background_color);
+        let mut canvas = graphics::Canvas::from_frame(ctx, BACKGROUND_COLOR);
 
+        let board = match &self.game_state {
+            GameState::OngoingGame(game) => game.board(),
+            GameState::FinishedGame(finished_game) => finished_game.board(),
+        };
+
+        drawing::draw_board(ctx, &mut canvas, &self.resources.images, board)?;
         canvas.finish(ctx)
     }
 
