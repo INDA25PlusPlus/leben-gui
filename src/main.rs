@@ -2,11 +2,10 @@
 #![allow(warnings)]
 
 use ggez::conf::{WindowMode, WindowSetup};
-use crate::game::GameContainer;
+use crate::gui::GuiState;
 
-mod game;
+mod gui;
 mod resources;
-mod drawing;
 
 const APP_ID: &str = "leben-gui-chess";
 const AUTHOR: &str = "Leonard Bengtsson";
@@ -33,6 +32,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .build()
         .expect("failed to create game context");
 
-    let game_container = GameContainer::new(&mut ctx)?;
-    ggez::event::run(ctx, event_loop, game_container);
+    let gui_container = GuiState::new(&mut ctx)?;
+    ggez::event::run(ctx, event_loop, gui_container);
 }

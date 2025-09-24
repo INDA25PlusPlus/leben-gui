@@ -3,7 +3,7 @@ pub mod colors;
 
 use ggez::graphics;
 use rsoderh_chess::Position;
-use crate::drawing::colors::BOARD_BORDER_COLOR;
+use crate::gui::drawing::colors::BOARD_BORDER_COLOR;
 use crate::resources::ImageResources;
 
 fn draw_board_square(ctx: &mut ggez::Context, canvas: &mut graphics::Canvas,

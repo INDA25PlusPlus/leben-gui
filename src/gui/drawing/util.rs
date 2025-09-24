@@ -1,5 +1,5 @@
 use ggez::graphics;
-use crate::drawing::colors::*;
+use crate::gui::drawing::colors::*;
 
 pub fn center_pos_offset(ctx: &ggez::Context, pos: (f32, f32)) -> (f32, f32) {
     let screen_size = ctx.gfx.drawable_size();

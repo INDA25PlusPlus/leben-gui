@@ -1,31 +1,33 @@
 use ggez::event;
 use ggez::graphics;
 use ggez::input::keyboard::KeyInput;
+use ggez::winit::dpi::Position;
 use rsoderh_chess::{FinishedGame, Game};
-use crate::resources::{Resources};
-use crate::drawing;
-use crate::drawing::colors::*;
+use crate::resources::Resources;
+use drawing::colors::*;
+
+mod drawing;
 
 enum GameState {
     OngoingGame(Game),
     FinishedGame(FinishedGame),
 }
 
-pub struct GameContainer {
+pub struct GuiState {
     resources: Resources,
     game_state: GameState,
 }
 
-impl GameContainer {
-    pub fn new(ctx: &mut ggez::Context) -> ggez::GameResult<GameContainer> {
-        Ok(GameContainer {
+impl GuiState {
+    pub fn new(ctx: &mut ggez::Context) -> ggez::GameResult<GuiState> {
+        Ok(GuiState {
             resources: Resources::new(ctx)?,
             game_state: GameState::OngoingGame(Game::new_standard()),
         })
     }
 }
 
-impl event::EventHandler for GameContainer {
+impl event::EventHandler for GuiState {
     fn update(&mut self, _ctx: &mut ggez::Context) -> ggez::GameResult {
         Ok(())
     }
