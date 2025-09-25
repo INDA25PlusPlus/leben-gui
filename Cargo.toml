@@ -5,4 +5,4 @@ edition = "2024"
 
 [dependencies]
 ggez = "0.9.3"
-rsoderh_chess = { git = "https://github.com/INDA25PlusPlus/rsoderh-chess" }
+rsoderh_chess = { git = "https://github.com/INDA25PlusPlus/rsoderh-chess", rev = "f406bb6" }
