@@ -109,7 +109,9 @@ impl GuiState {
             return;
         }
 
-        if let Some(selected_square) = selected_square {
+        if let Some((selected_square, available_moves)) = self.selected_square
+            .as_ref().map(|selection| (selection.pos, &selection.available_moves))
+        {
             let is_pawn = game.board().at_position(selected_square).as_piece()
                 .is_some_and(|piece| matches!(piece.kind, PieceKind::Pawn));
             let last_rank = match game.turn {
@@ -118,7 +120,12 @@ impl GuiState {
             };
             if is_pawn && clicked_square.row.get() == last_rank {
                 // promotion move
-                self.promotion_selection = Some(clicked_square);
+                let is_valid_move = available_moves.contains(&clicked_square);
+                if is_valid_move {
+                    self.promotion_selection = Some(clicked_square);
+                } else {
+                    self.reset_selection();
+                }
             } else {
                 // normal move
                 self.try_move(HalfMoveRequest::Standard {
@@ -128,12 +135,16 @@ impl GuiState {
                 self.reset_selection();
             }
         } else {
-            self.selected_square = game.valid_moves(clicked_square)
-                .map(|available_moves|
-                SquareSelection {
-                    pos: clicked_square,
-                    available_moves,
-                });
+            if game.board().at_position(clicked_square)
+                .as_piece().is_some_and(|piece| piece.color == game.turn)
+            {
+                self.selected_square = game.valid_moves(clicked_square)
+                    .map(|available_moves|
+                    SquareSelection {
+                        pos: clicked_square,
+                        available_moves,
+                    });
+            }
         }
     }
 }

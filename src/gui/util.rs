@@ -1,4 +1,4 @@
-use rsoderh_chess::{Color, PieceKind, Position};;
+use rsoderh_chess::{Color, PieceKind, Position};
 
 const MIN_SIZE_IN_SQUARES: f32 = 12_f32;
 const MIN_SQUARE_SIZE: f32 = 40_f32;
