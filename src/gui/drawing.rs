@@ -2,8 +2,9 @@ mod util;
 pub mod colors;
 
 use ggez::graphics;
-use rsoderh_chess::Position;
+use rsoderh_chess::{Color, Piece, Position};
 use colors::BOARD_BORDER_COLOR;
+use crate::gui;
 use crate::gui::SquareSelection;
 use crate::resources::ImageResources;
 
@@ -11,29 +12,88 @@ const SQUARE_BORDER_THICKNESS: f32 = 0.05;
 const TARGET_CIRCLE_RADIUS: f32 = 0.4;
 const TARGET_CIRCLE_THICKNESS: f32 = 0.05;
 
-struct SquareDrawState {
-    hovered: bool,
-    selected: bool,
-    targeted: bool,
+#[derive(Copy, Clone, Debug)]
+enum SquareDrawColor {
+    Normal, Targeted, Selected, PromotionSelection,
 }
 
-fn get_square_render_state(square: Position, selected_square: Option<&SquareSelection>,
-                           hovered_square: Option<Position>) -> SquareDrawState
+#[derive(Copy, Clone, Debug)]
+struct SquareDrawState {
+    hovered: bool,
+    color: SquareDrawColor,
+    piece: Option<Piece>,
+}
+
+fn get_square_render_state(square: Position, piece: Option<Piece>,
+                           selected_square: Option<&SquareSelection>,
+                           hovered_square: Option<Position>,
+                           turn: Option<Color>,
+                           promotion_selection: Option<Position>) -> SquareDrawState
 {
-    let targeted = selected_square.as_ref()
+    let hovered = hovered_square.is_some_and(|s| s == square);
+
+    let Some(turn) = turn else {
+        return SquareDrawState {
+            hovered,
+            color: SquareDrawColor::Normal,
+            piece,
+        };
+    };
+
+    if let Some(promotion_type) = promotion_selection
+        .map(|promotion_square|
+            gui::util::promotion_selection_type(turn, promotion_square, square))
+        .flatten()
+    {
+        return SquareDrawState {
+            hovered,
+            color: SquareDrawColor::PromotionSelection,
+            piece: Some(Piece { kind: promotion_type, color: turn }),
+        };
+    }
+
+    let is_selected = selected_square.as_ref().is_some_and(|sel| sel.pos == square);
+    if is_selected {
+        return SquareDrawState {
+            hovered,
+            color: SquareDrawColor::Selected,
+            piece,
+        };
+    }
+
+    let is_targeted = selected_square.as_ref()
         .is_some_and(|sel|
             sel.available_moves.contains(&square));
-    SquareDrawState {
-        hovered: hovered_square.is_some_and(|s| s == square),
-        selected: selected_square.as_ref().is_some_and(|sel| sel.pos == square),
-        targeted
-    }
+
+    return SquareDrawState {
+        hovered,
+        color: if is_targeted { SquareDrawColor::Targeted } else { SquareDrawColor::Normal },
+        piece,
+    };
+
+
+    // let mut promotion_selection_iter = turn.map(
+    //     |turn| selected_square.map(
+    //         |selected_square| gui::util::promotion_selection_iter(turn, selected_square.pos)
+    // )).flatten();
+    // let promotion_selection = promotion_selection_iter.map(
+    //     |mut iter| iter.find_map(
+    //         |(pos, piece_type)| (pos == square).then_some(piece_type))
+    // ).flatten()
+    // let is_selected = selected_square.as_ref().is_some_and(|sel| sel.pos == square);
+    // let targeted = selected_square.as_ref()
+    //     .is_some_and(|sel|
+    //         sel.available_moves.contains(&square));
+    // SquareDrawState {
+    //     hovered: hovered_square.is_some_and(|s| s == square),
+    // }
 }
 
 pub fn draw_board(ctx: &mut ggez::Context, canvas: &mut graphics::Canvas,
                   resources: &ImageResources, board: &rsoderh_chess::Board,
                   selected_square: Option<&SquareSelection>,
-                  hovered_square: Option<Position>) -> ggez::GameResult
+                  hovered_square: Option<Position>, turn: Option<Color>,
+                  promotion_selection: Option<Position>) -> ggez::GameResult
 {
     let square_params = util::square_draw_param(ctx);
     // board border
@@ -44,10 +104,11 @@ pub fn draw_board(ctx: &mut ggez::Context, canvas: &mut graphics::Canvas,
     for i in 0..8_u8 {
         for j in 0..8_u8 {
             let pos = Position::new(i, j).unwrap();
-            let square_render_state = get_square_render_state(pos, selected_square,
-                                                              hovered_square);
+            let piece = board.at_position(pos).as_piece().map(|p| *p);
+            let square_render_state = get_square_render_state(
+                pos, piece, selected_square, hovered_square, turn, promotion_selection);
             draw_board_square(ctx, canvas, square_params, resources, (i, j),
-                              board.at_position(pos), square_render_state)?;
+                              square_render_state)?;
         }
     }
     Ok(())
@@ -55,23 +116,15 @@ pub fn draw_board(ctx: &mut ggez::Context, canvas: &mut graphics::Canvas,
 
 fn draw_board_square(ctx: &mut ggez::Context, canvas: &mut graphics::Canvas,
                      square_params: graphics::DrawParam, resources: &ImageResources,
-                     index: (u8, u8), slot: rsoderh_chess::Slot,
-                     draw_state: SquareDrawState) -> ggez::GameResult
+                     index: (u8, u8), draw_state: SquareDrawState) -> ggez::GameResult
 {
     let x = index.0 as f32 - 4_f32;
     let y = 3_f32 - index.1 as f32;
     let is_dark_square = util::is_dark_square(index);
-    let square_color = if draw_state.selected {
-        colors::selected_square_color(is_dark_square)
-    } else {
-        colors::square_color(is_dark_square)
-    };
+
+    let (square_color, border_color) = colors::square_colors(is_dark_square, draw_state.color);
+
     if draw_state.hovered {
-        let border_color = if draw_state.selected {
-            colors::selected_square_border_color(is_dark_square)
-        } else {
-            colors::square_border_color(is_dark_square)
-        };
         util::draw_rect(
             ctx, canvas, square_params, border_color,
             x, y, 1_f32, 1_f32,
@@ -87,14 +140,10 @@ fn draw_board_square(ctx: &mut ggez::Context, canvas: &mut graphics::Canvas,
             x, y, 1_f32, 1_f32,
         )?;
     }
-    if draw_state.targeted {
-        let color = if draw_state.selected {
-            colors::selected_square_border_color(is_dark_square)
-        } else {
-            colors::square_border_color(is_dark_square)
-        };
+
+    if matches!(draw_state.color, SquareDrawColor::Targeted) {
         util::draw_circle(
-            ctx, canvas, square_params, color,
+            ctx, canvas, square_params, border_color,
             x + 0.5_f32, y + 0.5_f32, TARGET_CIRCLE_RADIUS,
         )?;
         util::draw_circle(
@@ -102,8 +151,9 @@ fn draw_board_square(ctx: &mut ggez::Context, canvas: &mut graphics::Canvas,
             x + 0.5_f32, y + 0.5_f32, TARGET_CIRCLE_RADIUS - TARGET_CIRCLE_THICKNESS,
         )?;
     }
-    if let Some(piece) = slot.as_piece() {
-        let image = &resources.get_piece(*piece).resource;
+
+    if let Some(piece) = draw_state.piece {
+        let image = &resources.get_piece(piece).resource;
         let image_size = (image.width(), image.height());
         let image_params = util::board_image_draw_param(
             ctx, image_size, (x + 0.5_f32, y + 0.5_f32), 0.9_f32

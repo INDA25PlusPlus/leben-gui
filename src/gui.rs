@@ -1,7 +1,7 @@
 use ggez::event;
 use ggez::graphics;
 use ggez::input::keyboard::KeyInput;
-use rsoderh_chess::{FinishedGame, Game, HalfMoveRequest, MoveResult, Position};
+use rsoderh_chess::{Color, FinishedGame, Game, HalfMoveRequest, MoveResult, PieceKind, Position};
 use crate::resources::Resources;
 use drawing::colors::*;
 use crate::util::ReplaceCell;
@@ -28,6 +28,7 @@ pub struct GuiState {
 
     hovered_square: Option<Position>,
     selected_square: Option<SquareSelection>,
+    promotion_selection: Option<Position>,
 }
 
 impl GuiState {
@@ -37,12 +38,14 @@ impl GuiState {
             game_state: ReplaceCell::new(GameState::OngoingGame(Game::new_standard())),
             hovered_square: None,
             selected_square: None,
+            promotion_selection: None,
         })
     }
 
     fn reset_selection(&mut self) {
         self.selected_square = None;
         self.hovered_square = None;
+        self.promotion_selection = None;
     }
 
     fn try_move(&mut self, half_move: HalfMoveRequest) {
@@ -69,6 +72,70 @@ impl GuiState {
             None
         }
     }
+
+    fn handle_promotion_selection_click(&mut self, clicked_square: Position) {
+        let Some(game) = self.ongoing() else { return; };
+        let Some(promotion_square) = self.promotion_selection else { return; };
+        if let Some(piece_type) = util::promotion_selection_type(
+            game.turn, promotion_square, clicked_square)
+        {
+            self.try_move(HalfMoveRequest::Promotion {
+                column: clicked_square.column,
+                kind: piece_type,
+            });
+        }
+        self.reset_selection();
+    }
+
+    fn handle_board_click(&mut self, clicked_square: Option<Position>) {
+        let Some(game) = self.ongoing() else { return; };
+
+        let selected_square = self.selected_square.as_ref().map(|selection| selection.pos);
+
+        let clicked_square = if let Some(clicked_square) = clicked_square {
+            clicked_square
+        } else {
+            self.reset_selection();
+            return;
+        };
+
+        if matches!(self.promotion_selection, Some(_)) {
+            self.handle_promotion_selection_click(clicked_square);
+            return;
+        }
+
+        if Some(clicked_square) == selected_square {
+            self.reset_selection();
+            return;
+        }
+
+        if let Some(selected_square) = selected_square {
+            let is_pawn = game.board().at_position(selected_square).as_piece()
+                .is_some_and(|piece| matches!(piece.kind, PieceKind::Pawn));
+            let last_rank = match game.turn {
+                Color::White => 7,
+                Color::Black => 0,
+            };
+            if is_pawn && clicked_square.row.get() == last_rank {
+                // promotion move
+                self.promotion_selection = Some(clicked_square);
+            } else {
+                // normal move
+                self.try_move(HalfMoveRequest::Standard {
+                    source: selected_square,
+                    dest: clicked_square,
+                });
+                self.reset_selection();
+            }
+        } else {
+            self.selected_square = game.valid_moves(clicked_square)
+                .map(|available_moves|
+                SquareSelection {
+                    pos: clicked_square,
+                    available_moves,
+                });
+        }
+    }
 }
 
 impl event::EventHandler for GuiState {
@@ -85,7 +152,9 @@ impl event::EventHandler for GuiState {
         };
 
         drawing::draw_board(ctx, &mut canvas, &self.resources.images, board,
-                            self.selected_square.as_ref(), self.hovered_square)?;
+                            self.selected_square.as_ref(), self.hovered_square,
+                            self.ongoing().map(|game| game.turn),
+                            self.promotion_selection)?;
         canvas.finish(ctx)
     }
 
@@ -95,28 +164,7 @@ impl event::EventHandler for GuiState {
         if matches!(button, event::MouseButton::Left) {
             if let Some(game) = self.ongoing() {
                 let clicked_square = util::global_to_board_pos(ctx, (x, y));
-                let selected_square = self.selected_square.as_ref().map(|selection| selection.pos);
-
-                if matches!(clicked_square, None) || clicked_square == selected_square {
-                    self.selected_square = None;
-                    self.reset_selection();
-                } else {
-                    let clicked_square = clicked_square.unwrap();
-                    if let Some(selected_square) = selected_square {
-                        self.try_move(HalfMoveRequest::Standard {
-                            source: selected_square,
-                            dest: clicked_square,
-                        });
-                        self.reset_selection();
-                    } else {
-                        self.selected_square = game.valid_moves(clicked_square)
-                            .map(|available_moves|
-                                SquareSelection {
-                                    pos: clicked_square,
-                                    available_moves,
-                                });
-                    }
-                }
+                self.handle_board_click(clicked_square);
             }
         }
         Ok(())

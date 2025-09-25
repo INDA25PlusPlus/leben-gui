@@ -1,4 +1,4 @@
-use rsoderh_chess::Position;
+use rsoderh_chess::{Color, PieceKind, Position};;
 
 const MIN_SIZE_IN_SQUARES: f32 = 12_f32;
 const MIN_SQUARE_SIZE: f32 = 40_f32;
@@ -44,4 +44,27 @@ pub fn global_to_board_pos(ctx: &ggez::Context, mouse_pos: (f32, f32)) -> Option
     } else {
         None
     }
+}
+
+pub fn promotion_selection_iter(to_play: Color, square: Position)
+                                -> impl Iterator<Item=(Position, PieceKind)>
+{
+    use PieceKind::*;
+    let piece_types = [Queen, Knight, Rook, Bishop];
+
+    let ranks = match to_play {
+        Color::White => [7, 6, 5, 4],
+        Color::Black => [0, 1, 2, 3],
+    };
+    let file = square.column.get();
+    ranks.into_iter()
+        .map(move |rank| Position::from_pair((file, rank)).unwrap())
+        .zip(piece_types.into_iter())
+}
+
+pub fn promotion_selection_type(turn: Color, promotion_square: Position,
+                                square: Position) -> Option<PieceKind>
+{
+    let mut iter = promotion_selection_iter(turn, promotion_square);
+    iter.find_map(|(pos, piece_type)| (pos == square).then_some(piece_type))
 }
