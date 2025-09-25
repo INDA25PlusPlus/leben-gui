@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(warnings)]
-
 use ggez::conf::{NumSamples, WindowMode, WindowSetup};
 use crate::gui::GuiState;
 
@@ -21,6 +18,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     })?;
 
     let window_mode = WindowMode::default()
+        .dimensions(1200_f32, 800_f32)
         .resizable(true);
     let window_setup = WindowSetup::default()
         .title(WINDOW_TITLE)
