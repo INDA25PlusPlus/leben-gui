@@ -1,16 +1,22 @@
 use ggez::event;
 use ggez::graphics;
 use ggez::input::keyboard::KeyInput;
-use ggez::winit::dpi::Position;
-use rsoderh_chess::{FinishedGame, Game};
+use rsoderh_chess::{FinishedGame, Game, Position};
 use crate::resources::Resources;
 use drawing::colors::*;
 
 mod drawing;
+mod util;
 
 enum GameState {
     OngoingGame(Game),
     FinishedGame(FinishedGame),
+}
+
+#[derive(Debug)]
+struct SquareSelection {
+    pos: Position,
+    available_moves: Box<[Position]>
 }
 
 pub struct GuiState {
@@ -40,7 +46,7 @@ impl event::EventHandler for GuiState {
             GameState::FinishedGame(finished_game) => finished_game.board(),
         };
 
-        drawing::draw_board(ctx, &mut canvas, &self.resources.images, board)?;
+        // drawing::draw_board(ctx, &mut canvas, &self.resources.images, board)?;
         canvas.finish(ctx)
     }
 
