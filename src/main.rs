@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 #![allow(warnings)]
 
-use ggez::conf::{WindowMode, WindowSetup};
+use ggez::conf::{NumSamples, WindowMode, WindowSetup};
 use crate::gui::GuiState;
 
 mod gui;
@@ -24,7 +24,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .resizable(true);
     let window_setup = WindowSetup::default()
         .title(WINDOW_TITLE)
-        .icon(resources::WHITE_KING_IMAGE);
+        .icon(resources::WHITE_KING_IMAGE)
+        .samples(NumSamples::Four);
 
     let (mut ctx, event_loop) = ggez::ContextBuilder::new(APP_ID, AUTHOR)
         .window_mode(window_mode)
