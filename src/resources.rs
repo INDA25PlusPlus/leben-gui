@@ -1,3 +1,4 @@
+use std::fmt::Debug;
 use ggez::context::Context;
 use ggez::GameResult;
 use ggez::graphics::Image;
@@ -16,15 +17,18 @@ pub const BLACK_QUEEN_IMAGE: &str = "/pieces/Chess_qdt45.png";
 pub const WHITE_KING_IMAGE: &str = "/pieces/Chess_klt45.png";
 pub const BLACK_KING_IMAGE: &str = "/pieces/Chess_kdt45.png";
 
+#[derive(Debug)]
 pub struct Resources {
     pub images: ImageResources,
 }
 
+#[derive(Debug)]
 pub struct ResourceEntry<T> {
     pub path: &'static str,
     pub resource: T,
 }
 
+#[derive(Debug)]
 pub struct ImageResources {
     pub white_pawn: ResourceEntry<Image>,
     pub black_pawn: ResourceEntry<Image>,
