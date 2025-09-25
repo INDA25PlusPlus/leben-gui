@@ -2,6 +2,7 @@ mod util;
 pub mod colors;
 
 use ggez::graphics;
+use ggez::graphics::PxScale;
 use rsoderh_chess::{Color, Piece, Position};
 use colors::BOARD_BORDER_COLOR;
 use crate::gui;
@@ -11,6 +12,22 @@ use crate::resources::ImageResources;
 const SQUARE_BORDER_THICKNESS: f32 = 0.05;
 const TARGET_CIRCLE_RADIUS: f32 = 0.4;
 const TARGET_CIRCLE_THICKNESS: f32 = 0.05;
+
+#[derive(Copy, Clone, Debug)]
+pub enum TextAlignHorizontal {
+    Left, Middle, Right,
+}
+
+#[derive(Copy, Clone, Debug)]
+pub enum TextAlignVertical {
+    Top, Middle, Bottom,
+}
+
+#[derive(Copy, Clone, Debug)]
+pub struct TextAlign {
+    pub horizontal: TextAlignHorizontal,
+    pub vertical: TextAlignVertical,
+}
 
 #[derive(Copy, Clone, Debug)]
 enum SquareDrawColor {
@@ -154,11 +171,27 @@ fn draw_board_square(ctx: &mut ggez::Context, canvas: &mut graphics::Canvas,
 
     if let Some(piece) = draw_state.piece {
         let image = &resources.get_piece(piece).resource;
-        let image_size = (image.width(), image.height());
-        let image_params = util::board_image_draw_param(
+        let image_size = (image.width() as f32, image.height() as f32);
+        let image_params = util::board_relative_draw_param(
             ctx, image_size, (x + 0.5_f32, y + 0.5_f32), 0.9_f32
         );
         canvas.draw(image, image_params);
     }
+    Ok(())
+}
+
+pub fn draw_status_text(ctx: &mut ggez::Context, canvas: &mut graphics::Canvas,
+                        text: &str) -> ggez::GameResult
+{
+    let mut text = graphics::Text::new(text);
+    text.set_scale(PxScale::from(24_f32));
+    let [w, h] = text.measure(ctx)?.into();
+    let text_align = TextAlign {
+        horizontal: TextAlignHorizontal::Middle,
+        vertical: TextAlignVertical::Top,
+    };
+    let relative_pos = (0_f32, 4.5_f32);
+    let params = util::board_relative_text_param(ctx, (w, h), text_align, relative_pos);
+    canvas.draw(&text, params);
     Ok(())
 }

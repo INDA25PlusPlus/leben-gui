@@ -1,9 +1,10 @@
 use ggez::event;
 use ggez::graphics;
 use ggez::input::keyboard::KeyInput;
-use rsoderh_chess::{Color, FinishedGame, Game, HalfMoveRequest, MoveResult, PieceKind, Position};
+use rsoderh_chess::{Color, FinishedGame, Game, GameResult, HalfMoveRequest, MoveResult, PieceKind, Position};
 use crate::resources::Resources;
 use drawing::colors::*;
+use crate::gui::drawing::{TextAlign, TextAlignHorizontal, TextAlignVertical};
 use crate::util::ReplaceCell;
 
 mod drawing;
@@ -166,6 +167,22 @@ impl event::EventHandler for GuiState {
                             self.selected_square.as_ref(), self.hovered_square,
                             self.ongoing().map(|game| game.turn),
                             self.promotion_selection)?;
+
+        let status_text = match self.game_state.get_ref() {
+            GameState::OngoingGame(game) => match game.turn {
+                Color::White => "White to play",
+                Color::Black => "Black to play",
+            }
+            GameState::FinishedGame(finished_game) => match finished_game.result() {
+                GameResult::Checkmate { winner, .. } => match winner {
+                    Color::White => "White won by checkmate!",
+                    Color::Black => "Black won by checkmate!",
+                },
+            } ,
+        };
+
+        drawing::draw_status_text(ctx, &mut canvas, status_text)?;
+
         canvas.finish(ctx)
     }
 
