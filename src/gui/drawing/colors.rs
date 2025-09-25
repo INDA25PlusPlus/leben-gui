@@ -2,6 +2,7 @@ use std::num::ParseIntError;
 use ggez::graphics::Color;
 use crate::gui::drawing::{SquareDrawColor, SquareDrawState};
 
+/// Convert hex code to `Color` object
 const fn hex(s: &str) -> Color {
     let c = match u32::from_str_radix(s, 16) {
         Ok(c) => c,
@@ -21,6 +22,7 @@ const fn from_rgb(r: u8, g: u8, b: u8) -> Color {
     Color::new(r, g, b, 1_f32)
 }
 
+/// Multiply all components of the color object
 const fn mult(c: Color, factor: f32) -> Color {
     Color::new(c.r * factor, c.g * factor, c.b * factor, c.a)
 }

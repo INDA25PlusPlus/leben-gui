@@ -1,15 +1,17 @@
 use ggez::{graphics};
 use ggez::graphics::DrawParam;
-use crate::gui::drawing::colors::*;
 use crate::gui::drawing::{TextAlign, TextAlignHorizontal, TextAlignVertical};
 use crate::gui::util::square_size;
 
 const CIRCLE_TOLERANCE: f32 = 0.002_f32;
 
+/// returns: Whether the square at the given index is a dark square
 pub fn is_dark_square(square_index: (u8, u8)) -> bool {
     (square_index.0 + square_index.1) % 2 == 0
 }
 
+/// returns: The [DrawParam] that transforms positions from the board coordinate space to screen
+///          coordinate space.
 pub fn square_draw_param(ctx: &ggez::Context) -> DrawParam {
     let square_size = square_size(ctx);
     let screen_size = ctx.gfx.drawable_size();
@@ -18,6 +20,14 @@ pub fn square_draw_param(ctx: &ggez::Context) -> DrawParam {
         .dest([screen_size.0 * 0.5_f32, screen_size.1 * 0.5_f32])
 }
 
+/// # Arguments
+///
+/// * `element_size`: The element's size in pixels prior to being transformed
+/// * `board_pos`: The element's position relative to the board coordinate space
+/// * `relative_height`: The height of the element relative to the board coordinate space
+///
+/// returns: The [DrawParam] that transforms a position from the board coordinate space to screen
+///          coordinate space for a drawable object such as an [Image](graphics::Image)
 pub fn board_relative_draw_param(ctx: &ggez::Context, element_size: (f32, f32),
                                  board_pos: (f32, f32), relative_height: f32) -> DrawParam
 {
@@ -31,6 +41,14 @@ pub fn board_relative_draw_param(ctx: &ggez::Context, element_size: (f32, f32),
         .dest([screen_size.0 * 0.5_f32, screen_size.1 * 0.5_f32])
 }
 
+/// # Arguments
+///
+/// * `element_size`: The element's size in pixels prior to being transformed
+/// * `text_align`: Options for text alignment
+/// * `board_pos`: The element's position relative to the board coordinate space
+///
+/// returns: The [DrawParam] that transforms a position from the board coordinate space to screen
+///          coordinate space for a text object
 pub fn board_relative_text_param(ctx: &ggez::Context, element_size: (f32, f32),
                                  text_align: TextAlign, board_pos: (f32, f32)) -> DrawParam
 {
@@ -57,7 +75,7 @@ pub fn board_relative_text_param(ctx: &ggez::Context, element_size: (f32, f32),
         ])
 }
 
-pub fn draw_rect(ctx: &ggez::Context, canvas: &mut graphics::Canvas, params: graphics::DrawParam,
+pub fn draw_rect(ctx: &ggez::Context, canvas: &mut graphics::Canvas, params: DrawParam,
                  color: graphics::Color, x: f32, y: f32, w: f32, h: f32) -> ggez::GameResult
 {
     let rect = graphics::Mesh::new_rectangle(
@@ -67,7 +85,7 @@ pub fn draw_rect(ctx: &ggez::Context, canvas: &mut graphics::Canvas, params: gra
     Ok(())
 }
 
-pub fn draw_circle(ctx: &ggez::Context, canvas: &mut graphics::Canvas, params: graphics::DrawParam,
+pub fn draw_circle(ctx: &ggez::Context, canvas: &mut graphics::Canvas, params: DrawParam,
                    color: graphics::Color, x: f32, y: f32, r: f32) -> ggez::GameResult
 {
     let circle = graphics::Mesh::new_circle(

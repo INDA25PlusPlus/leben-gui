@@ -17,18 +17,21 @@ pub const BLACK_QUEEN_IMAGE: &str = "/pieces/Chess_qdt45.png";
 pub const WHITE_KING_IMAGE: &str = "/pieces/Chess_klt45.png";
 pub const BLACK_KING_IMAGE: &str = "/pieces/Chess_kdt45.png";
 
-#[derive(Debug)]
+/// Collection of various resources required for the application
+#[derive(Clone, Debug)]
 pub struct Resources {
     pub images: ImageResources,
 }
 
-#[derive(Debug)]
-pub struct ResourceEntry<T> {
+/// Contains a resource with its associated file path
+#[derive(Clone, Debug)]
+pub struct ResourceEntry<T: Clone + Debug> {
     pub path: &'static str,
     pub resource: T,
 }
 
-#[derive(Debug)]
+/// Collection of all the images required for the application
+#[derive(Clone, Debug)]
 pub struct ImageResources {
     pub white_pawn: ResourceEntry<Image>,
     pub black_pawn: ResourceEntry<Image>,
@@ -45,6 +48,7 @@ pub struct ImageResources {
 }
 
 impl ImageResources {
+    /// returns: Which image resource corresponds to the given piece
     pub fn get_piece(&self, piece: Piece) -> &ResourceEntry<Image> {
         use rsoderh_chess::Color::*;
         use rsoderh_chess::PieceKind::*;
@@ -65,6 +69,7 @@ impl ImageResources {
     }
 }
 
+/// Create an image resource given its file path
 fn create_image_resource(ctx: &mut Context,
                          path: &'static str) -> GameResult<ResourceEntry<Image>>
 {
@@ -75,6 +80,7 @@ fn create_image_resource(ctx: &mut Context,
 }
 
 impl Resources {
+    /// Instantiate a `Resources` object, loading all required resources
     pub fn new(ctx: &mut Context) -> GameResult<Resources> {
         Ok(Resources {
             images: ImageResources {

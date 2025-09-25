@@ -4,29 +4,33 @@ use ggez::input::keyboard::KeyInput;
 use rsoderh_chess::{Color, FinishedGame, Game, GameResult, HalfMoveRequest, MoveResult, PieceKind, Position};
 use crate::resources::Resources;
 use drawing::colors::*;
-use crate::gui::drawing::{TextAlign, TextAlignHorizontal, TextAlignVertical};
 use crate::util::ReplaceCell;
 
 mod drawing;
 mod util;
 
+/// Contains the current state of a chess game, whether it is ongoing or finished
 #[derive(Debug)]
 enum GameState {
     OngoingGame(Game),
     FinishedGame(FinishedGame),
 }
 
+/// Represents a selected square and a cache of its available moves
 #[derive(Debug)]
 struct SquareSelection {
     pos: Position,
     available_moves: Box<[Position]>
 }
 
+/// Represents the current state of the application
 #[derive(Debug)]
 pub struct GuiState {
+    // game data and resources
     resources: Resources,
     game_state: ReplaceCell<GameState>,
 
+    // gui/visuals data
     hovered_square: Option<Position>,
     selected_square: Option<SquareSelection>,
     promotion_selection: Option<Position>,

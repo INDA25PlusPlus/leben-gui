@@ -31,7 +31,14 @@ pub struct TextAlign {
 
 #[derive(Copy, Clone, Debug)]
 enum SquareDrawColor {
-    Normal, Targeted, Selected, PromotionSelection,
+    /// Normal state
+    Normal,
+    /// Targeted by the selected piece
+    Targeted,
+    /// Currently selected square
+    Selected,
+    /// Displays options for performing a promotion move
+    PromotionSelection,
 }
 
 #[derive(Copy, Clone, Debug)]

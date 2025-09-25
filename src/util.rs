@@ -1,5 +1,9 @@
 use std::fmt::{Debug, Formatter};
 
+/// Encapsulating type that provides ownership to its contained value without needing ownership to
+/// the `ReplaceCell`, provided a replacement value is given.
+///
+/// see: [replace](ReplaceCell::replace)
 pub struct ReplaceCell<T>(Option<T>);
 
 impl<T> ReplaceCell<T> {
@@ -7,10 +11,13 @@ impl<T> ReplaceCell<T> {
         ReplaceCell(Some(value))
     }
 
+    /// Provide access to the contained value through moving out the old value and replacing it with
+    /// a new value
     pub fn replace(&mut self, f: impl FnOnce(T) -> T) {
         self.0 = Some(f(self.0.take().unwrap()))
     }
 
+    /// Consume the object, returning the contained value
     pub fn into_inner(self) -> T {
         self.0.unwrap()
     }

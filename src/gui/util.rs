@@ -4,6 +4,7 @@ const MIN_SIZE_IN_SQUARES: f32 = 12_f32;
 const MIN_SQUARE_SIZE: f32 = 40_f32;
 const MAX_SQUARE_SIZE: f32 = 100_f32;
 
+/// returns: The calculated current board square size, in pixels
 pub fn square_size(ctx: &ggez::Context) -> f32 {
     let screen_size = ctx.gfx.drawable_size();
     let square_size = f32::min(
@@ -13,16 +14,20 @@ pub fn square_size(ctx: &ggez::Context) -> f32 {
     f32::min(f32::max(square_size, MIN_SQUARE_SIZE), MAX_SQUARE_SIZE)
 }
 
+/// returns: A position relative to the center of the screen, converted to screen coordinate space
 fn center_to_global_pos(ctx: &ggez::Context, offset: (f32, f32)) -> (f32, f32) {
     let screen_size = ctx.gfx.drawable_size();
     (offset.0 + screen_size.0 * 0.5_f32, offset.1 + screen_size.1 * 0.5_f32)
 }
 
+/// returns: A position in screen coordinate space, relative to the center of the screen
 fn global_to_center_pos(ctx: &ggez::Context, pos: (f32, f32)) -> (f32, f32) {
     let screen_size = ctx.gfx.drawable_size();
     (pos.0 - screen_size.0 * 0.5_f32, pos.1 - screen_size.1 * 0.5_f32)
 }
 
+/// returns: A position in screen coordinate space, converted to board coordinate space, if within
+///          the range -128 to 127 (inclusive)
 pub fn global_to_board_offset_pos(ctx: &ggez::Context, mouse_pos: (f32, f32)) -> Option<(i8, i8)> {
     let relative = global_to_center_pos(ctx, mouse_pos);
     let square_size = square_size(ctx);
@@ -36,8 +41,10 @@ pub fn global_to_board_offset_pos(ctx: &ggez::Context, mouse_pos: (f32, f32)) ->
     }
 }
 
-pub fn global_to_board_pos(ctx: &ggez::Context, mouse_pos: (f32, f32)) -> Option<Position> {
-    let relative = global_to_board_offset_pos(ctx, mouse_pos)?;
+/// returns: A position in screen coordinate space, converted to board coordinate space and
+///          converted to a board [Position] if valid
+pub fn global_to_board_pos(ctx: &ggez::Context, pos: (f32, f32)) -> Option<Position> {
+    let relative = global_to_board_offset_pos(ctx, pos)?;
     let index_range = 0i8..=7;
     if index_range.contains(&relative.0) && index_range.contains(&relative.1) {
         Position::new(relative.0 as u8, relative.1 as u8)
@@ -46,6 +53,8 @@ pub fn global_to_board_pos(ctx: &ggez::Context, mouse_pos: (f32, f32)) -> Option
     }
 }
 
+/// returns: An [Iterator] containing tuples with a [Position] and [PieceKind] representing what
+///          piece should be displayed at that position in the promotion type selection menu
 pub fn promotion_selection_iter(to_play: Color, square: Position)
                                 -> impl Iterator<Item=(Position, PieceKind)>
 {
@@ -62,6 +71,8 @@ pub fn promotion_selection_iter(to_play: Color, square: Position)
         .zip(piece_types.into_iter())
 }
 
+/// returns: Which piece type should be displayed at the provided `square`, if it is part of the
+///          promotion type selection menu for the given `promotion_square`
 pub fn promotion_selection_type(turn: Color, promotion_square: Position,
                                 square: Position) -> Option<PieceKind>
 {
