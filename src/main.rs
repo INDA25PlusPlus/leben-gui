@@ -6,6 +6,7 @@ use crate::gui::GuiState;
 
 mod gui;
 mod resources;
+mod util;
 
 const APP_ID: &str = "leben-gui-chess";
 const AUTHOR: &str = "Leonard Bengtsson";
