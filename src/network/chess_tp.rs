@@ -1,6 +1,10 @@
-use rsoderh_chess::{Board, PieceKind, Position};
-
 mod util;
+
+use rsoderh_chess::{Board, Color, HalfMoveRequest, PieceKind, Position};
+
+pub const BUFFER_SIZE: usize = 128;
+const CHESS_MOVE_IDENTIFIER: &[u8] = b"ChessMOVE";
+const CHESS_QUIT_IDENTIFIER: &[u8] = b"ChessQUIT";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GameStateType {
@@ -161,4 +165,109 @@ impl<'a> MessageReader<'a> {
         let fen = self.read_up_to(b':')?;
         util::board_from_fen(fen).ok_or(())
     }
+}
+
+pub enum Message {
+    ChessMove { player: Option<Color>, chess_move: HalfMoveRequest, new_game_state: GameStateType, new_board: Board },
+    ChessQuit { payload: String },
+}
+
+impl Message {
+    pub fn encode(self) -> Result<[u8; BUFFER_SIZE], ()> {
+        match self {
+            Message::ChessMove { player, chess_move, new_game_state, new_board } => {
+                encode_move(player.ok_or(())?, chess_move, new_game_state, &new_board)
+            }
+            Message::ChessQuit { payload } => {
+                encode_quit(&payload)
+            }
+        }
+    }
+
+    pub fn decode(message: &[u8]) -> Result<Message, ()> {
+        let mut reader = MessageReader::new(message);
+        let message_identifier = reader.read_up_to(b':')?;
+        reader.skip(1)?;
+        match message_identifier {
+            CHESS_MOVE_IDENTIFIER => decode_move(reader),
+            CHESS_QUIT_IDENTIFIER => decode_quit(reader),
+            _ => Err(()),
+        }
+    }
+}
+
+fn encode_move(player: Color, chess_move: HalfMoveRequest, new_game_state: GameStateType,
+               new_board: &Board) -> Result<[u8; BUFFER_SIZE], ()>
+{
+    let (source_pos, dest_pos, promotion_type) = match chess_move {
+        HalfMoveRequest::Standard { source, dest } => (source, dest, None),
+        HalfMoveRequest::Promotion { column, kind } => {
+            let (source_rank, dest_rank) = match player {
+                Color::White => (6, 7),
+                Color::Black => (1, 0),
+            };
+            let source = Position::new(column.get(), source_rank).unwrap();
+            let dest = Position::new(column.get(), dest_rank).unwrap();
+            (source, dest, Some(kind))
+        }
+    };
+
+    let message = MessageBuilder::<BUFFER_SIZE>::new(Some(b'0'))?
+        .write_slice(CHESS_MOVE_IDENTIFIER)?
+        .write(b':')?
+        .write_pos(source_pos)?
+        .write_pos(dest_pos)?
+        .write_promotion_type(promotion_type)?
+        .write(b':')?
+        .write_game_state(new_game_state)?
+        .write(b':')?
+        .write_board(new_board)?
+        .write(b':')?;
+
+    Ok(message.build())
+}
+
+fn encode_quit(payload: &str) -> Result<[u8; BUFFER_SIZE], ()> {
+    let message = MessageBuilder::<BUFFER_SIZE>::new(Some(b'0'))?
+        .write_slice(CHESS_QUIT_IDENTIFIER)?
+        .write(b':')?
+        .write_slice(payload.as_bytes())?
+        .write(b':')?;
+
+    Ok(message.build())
+}
+
+fn decode_move(mut reader: MessageReader) -> Result<Message, ()> {
+    let move_source = reader.read_pos()?;
+    let move_dest = reader.read_pos()?;
+    let promotion_type = reader.read_promotion_type()?;
+    let chess_move = match promotion_type {
+        Some(promotion_type) => HalfMoveRequest::Promotion {
+            column: move_source.column,
+            kind: promotion_type,
+        },
+        None => HalfMoveRequest::Standard {
+            source: move_source,
+            dest: move_dest,
+        },
+    };
+    reader.check_and_skip(b':')?;
+    let new_game_state = reader.read_game_state()?;
+    reader.check_and_skip(b':')?;
+    let new_board = reader.read_board_argument()?;
+    reader.check_and_skip(b':')?;
+    reader.check_rest(b'0')?;
+    Ok(Message::ChessMove {
+        player: None,
+        chess_move,
+        new_game_state,
+        new_board,
+    })
+}
+
+fn decode_quit(mut reader: MessageReader) -> Result<Message, ()> {
+    let payload = str::from_utf8(reader.read_up_to(b':')?).map_err(|_| ())?;
+    reader.skip(1)?;
+    reader.check_rest(b'0')?;
+    Ok(Message::ChessQuit { payload: payload.to_owned() })
 }
