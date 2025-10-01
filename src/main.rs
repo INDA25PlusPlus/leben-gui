@@ -33,6 +33,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .build()
         .expect("failed to create game context");
 
-    let gui_container = GuiState::new(&mut ctx)?;
+    let gui_container = GuiState::new_local(&mut ctx)?;
     ggez::event::run(ctx, event_loop, gui_container);
 }

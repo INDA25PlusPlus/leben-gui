@@ -1,9 +1,14 @@
+use std::error::Error;
+
 use ggez::event;
 use ggez::graphics;
 use ggez::input::keyboard::KeyInput;
 use rsoderh_chess::{Color, FinishedGame, Game, GameResult, HalfMoveRequest, MoveResult, PieceKind, Position};
+use crate::network::chess_tp::GameStateType;
+use crate::network::chess_tp::Message;
 use crate::resources::Resources;
 use drawing::colors::*;
+use crate::network::GameConnection;
 use crate::util::ReplaceCell;
 
 mod drawing;
@@ -30,6 +35,9 @@ pub struct GuiState {
     resources: Resources,
     game_state: ReplaceCell<GameState>,
 
+    // network connection
+    connection: Option<GameConnection>,
+
     // gui/visuals data
     hovered_square: Option<Position>,
     selected_square: Option<SquareSelection>,
@@ -37,14 +45,42 @@ pub struct GuiState {
 }
 
 impl GuiState {
-    pub fn new(ctx: &mut ggez::Context) -> ggez::GameResult<GuiState> {
+    pub fn new_local(ctx: &mut ggez::Context) -> ggez::GameResult<GuiState> {
         Ok(GuiState {
             resources: Resources::new(ctx)?,
             game_state: ReplaceCell::new(GameState::OngoingGame(Game::new_standard())),
+            connection: None,
             hovered_square: None,
             selected_square: None,
             promotion_selection: None,
         })
+    }
+
+    pub fn new_remote(ctx: &mut ggez::Context, connection: GameConnection) -> Result<GuiState, Box<dyn Error>> {
+        Ok(GuiState {
+            resources: Resources::new(ctx)?,
+            game_state: ReplaceCell::new(GameState::OngoingGame(Game::new_standard())),
+            connection: Some(connection),
+            hovered_square: None,
+            selected_square: None,
+            promotion_selection: None,
+        })
+    }
+
+    pub fn is_local_player_turn(&self) -> bool {
+        match self.game_state.get_ref() {
+            GameState::OngoingGame(game) => {
+                self.connection.as_ref()
+                    .is_none_or(|connection| connection.local_player() == game.turn)
+            },
+            GameState::FinishedGame(finished_game) => false,
+        }
+    }
+
+    pub fn on_quit(&mut self, message: Option<String>) {
+        if let Some(connection) = &mut self.connection {
+            let _ = connection.send_message(Message::ChessQuit { payload: message.unwrap_or(String::new()) });
+        }
     }
 
     fn reset_selection(&mut self) {
@@ -53,17 +89,123 @@ impl GuiState {
         self.promotion_selection = None;
     }
 
-    fn try_move(&mut self, half_move: HalfMoveRequest) {
-        self.game_state.replace(|game_state| match game_state {
-            GameState::OngoingGame(game) => match game.perform_move(half_move) {
-                MoveResult::Ongoing(game, check_outcome) => {
-                    GameState::OngoingGame(game)
+    fn game_state_type(&self) -> GameStateType {
+        match self.game_state.get_ref() {
+            GameState::OngoingGame(game) => GameStateType::Normal,
+            GameState::FinishedGame(game) => match game.result() {
+                GameResult::Checkmate { winner, attacked_king } => {
+                    match winner {
+                        Color::White => GameStateType::WhiteWon,
+                        Color::Black => GameStateType::BlackWon,
+                    }
                 },
-                MoveResult::Finished(game) => GameState::FinishedGame(game),
-                MoveResult::Illegal(game, _) => GameState::OngoingGame(game),
+            }
+        }
+    }
+
+    fn try_move(&mut self, chess_move: HalfMoveRequest, is_remote_move: bool) {
+        fn clone_chess_move(chess_move: &HalfMoveRequest) -> HalfMoveRequest {
+            match chess_move {
+                HalfMoveRequest::Standard { source, dest } => {
+                    HalfMoveRequest::Standard { source: *source, dest: *dest }
+                },
+                HalfMoveRequest::Promotion { column, kind } => {
+                    HalfMoveRequest::Promotion { column: *column, kind: *kind }
+                },
+            }
+        }
+
+        fn get_game_state_type(game_result: &GameResult) -> GameStateType {
+            match game_result {
+                GameResult::Checkmate { winner, attacked_king } => {
+                    match winner {
+                        Color::White => GameStateType::WhiteWon,
+                        Color::Black => GameStateType::BlackWon,
+                    }
+                },
+            }
+        }
+
+        self.game_state.replace(|game_state| match game_state {
+            GameState::OngoingGame(game) => {
+                let player = game.turn;
+                let (new_game_state,
+                    new_game_state_type,
+                    new_board
+                ) = match game.perform_move(clone_chess_move(&chess_move)) {
+                    MoveResult::Ongoing(game, ..) => {
+                        let new_board = game.board().clone();
+                        (GameState::OngoingGame(game), GameStateType::Normal, new_board)
+                    },
+                    MoveResult::Finished(game) => {
+                        let game_state_type = get_game_state_type(game.result());
+                        let new_board = game.board().clone();
+                        (GameState::FinishedGame(game), game_state_type, new_board)
+                    },
+                    MoveResult::Illegal(game, _) => {
+                        return GameState::OngoingGame(game);
+                    }
+                };
+                if !is_remote_move {
+                    if let Some(connection) = &mut self.connection {
+                        let _ = connection.send_message(Message::ChessMove {
+                            player: Some(player),
+                            chess_move,
+                            new_game_state: new_game_state_type,
+                            new_board,
+                        });
+                    }
+                }
+                new_game_state
             }
             GameState::FinishedGame(game) => GameState::FinishedGame(game),
         });
+    }
+
+    fn handle_message(&mut self, ctx: &mut ggez::Context, message: Message) {
+        match message {
+            Message::ChessMove {
+                player,
+                chess_move,
+                new_game_state,
+                new_board
+            } => {
+                self.try_move(chess_move, true);
+
+                let board = match self.game_state.get_ref() {
+                    GameState::OngoingGame(game) => game.board(),
+                    GameState::FinishedGame(finished_game) => finished_game.board(),
+                };
+                let game_state = self.game_state_type();
+                if new_board != *board || new_game_state != game_state {
+                    if self.connection.as_ref().is_some_and(|conn| conn.strict_rule_policy()) {
+                        println!("Other player made an invalid move");
+                        self.on_quit(Some("Invalid move".to_owned()));
+                        ctx.request_quit();
+                    } else {
+                        self.game_state.replace(|game_state| {
+                            let turn = if let GameState::OngoingGame(game) = game_state {
+                                game.turn
+                            } else {
+                                return game_state;
+                            };
+                            match new_game_state {
+                                GameStateType::Normal => {
+                                    GameState::OngoingGame(Game::new(new_board, turn))
+                                },
+                                GameStateType::WhiteWon | GameStateType::BlackWon | GameStateType::Draw => {
+                                    unimplemented!("Cannot construct `FinishedGame`")
+                                },
+                            }
+                        });
+                    }
+                }
+            },
+            Message::ChessQuit { payload } => {
+                println!("Other player quit: {payload}");
+                ctx.request_quit();
+            },
+        }
     }
 
     fn is_ongoing(&self) -> bool {
@@ -79,21 +221,32 @@ impl GuiState {
     }
 
     fn handle_promotion_selection_click(&mut self, clicked_square: Position) {
+        if !self.is_local_player_turn() {
+            self.reset_selection();
+            return;
+        }
         let Some(game) = self.ongoing() else { return; };
         let Some(promotion_square) = self.promotion_selection else { return; };
         if let Some(piece_type) = util::promotion_selection_type(
             game.turn, promotion_square, clicked_square)
         {
-            self.try_move(HalfMoveRequest::Promotion {
-                column: clicked_square.column,
-                kind: piece_type,
-            });
+            self.try_move(
+                HalfMoveRequest::Promotion {
+                    column: clicked_square.column,
+                    kind: piece_type,
+                },
+                false
+            );
         }
         self.reset_selection();
     }
 
     fn handle_board_click(&mut self, clicked_square: Option<Position>) {
         let Some(game) = self.ongoing() else { return; };
+        if !self.is_local_player_turn() {
+            self.reset_selection();
+            return;
+        }
 
         let selected_square = self.selected_square.as_ref().map(|selection| selection.pos);
 
@@ -133,10 +286,13 @@ impl GuiState {
                 }
             } else {
                 // normal move
-                self.try_move(HalfMoveRequest::Standard {
-                    source: selected_square,
-                    dest: clicked_square,
-                });
+                self.try_move(
+                    HalfMoveRequest::Standard {
+                        source: selected_square,
+                        dest: clicked_square,
+                    },
+                    false
+                );
                 self.reset_selection();
             }
         } else {
@@ -155,7 +311,14 @@ impl GuiState {
 }
 
 impl event::EventHandler for GuiState {
-    fn update(&mut self, _ctx: &mut ggez::Context) -> ggez::GameResult {
+    fn update(&mut self, ctx: &mut ggez::Context) -> ggez::GameResult {
+        if !self.is_local_player_turn() {
+            if let Some(connection) = &mut self.connection {
+                if let Some(message) = connection.read_message().ok() {
+                    self.handle_message(ctx, message);
+                }
+            }
+        }
         Ok(())
     }
 
@@ -170,7 +333,7 @@ impl event::EventHandler for GuiState {
         drawing::draw_board(ctx, &mut canvas, &self.resources.images, board,
                             self.selected_square.as_ref(), self.hovered_square,
                             self.ongoing().map(|game| game.turn),
-                            self.promotion_selection)?;
+                            self.promotion_selection)?;;
 
         let status_text = match self.game_state.get_ref() {
             GameState::OngoingGame(game) => match game.turn {
@@ -216,5 +379,10 @@ impl event::EventHandler for GuiState {
     {
         // overrides the default behavior of exiting the program when pressing ESC
         Ok(())
+    }
+
+    fn quit_event(&mut self, _ctx: &mut ggez::Context) -> Result<bool, ggez::GameError> {
+        self.on_quit(Some("Player quit the game".into()));
+        Ok(false)
     }
 }
