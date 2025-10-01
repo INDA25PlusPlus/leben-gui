@@ -220,6 +220,36 @@ impl GuiState {
         }
     }
 
+    fn render_flipped(&self) -> bool {
+        self.connection.as_ref().is_some_and(|conn| matches!(conn.local_player(), Color::Black))
+    }
+
+    fn status_text(&self) -> &str {
+        let (white_to_play, white_won, black_to_play, black_won) = if let Some(connection) = &self.connection {
+            let (your_turn, you_won, opponents_turn, opponent_won) = (
+                "Your turn", "You won by checkmate!", "Opponent's turn", "Opponent won by checkmate!",
+            );
+            match connection.local_player() {
+                Color::White => (your_turn, you_won, opponents_turn, opponent_won),
+                Color::Black => (opponents_turn, opponent_won, your_turn, you_won),
+            }
+        } else {
+            ("White to play", "White won by checkmate!", "Black to play", "Black won by checkmate!")
+        };
+        match self.game_state.get_ref() {
+            GameState::OngoingGame(game) => match game.turn {
+                Color::White => white_to_play,
+                Color::Black => black_to_play,
+            }
+            GameState::FinishedGame(finished_game) => match finished_game.result() {
+                GameResult::Checkmate { winner, .. } => match winner {
+                    Color::White => white_won,
+                    Color::Black => black_won,
+                },
+            },
+        }
+    }
+
     fn handle_promotion_selection_click(&mut self, clicked_square: Position) {
         if !self.is_local_player_turn() {
             self.reset_selection();
@@ -333,22 +363,9 @@ impl event::EventHandler for GuiState {
         drawing::draw_board(ctx, &mut canvas, &self.resources.images, board,
                             self.selected_square.as_ref(), self.hovered_square,
                             self.ongoing().map(|game| game.turn),
-                            self.promotion_selection)?;;
+                            self.promotion_selection, self.render_flipped())?;;
 
-        let status_text = match self.game_state.get_ref() {
-            GameState::OngoingGame(game) => match game.turn {
-                Color::White => "White to play",
-                Color::Black => "Black to play",
-            }
-            GameState::FinishedGame(finished_game) => match finished_game.result() {
-                GameResult::Checkmate { winner, .. } => match winner {
-                    Color::White => "White won by checkmate!",
-                    Color::Black => "Black won by checkmate!",
-                },
-            } ,
-        };
-
-        drawing::draw_status_text(ctx, &mut canvas, status_text)?;
+        drawing::draw_status_text(ctx, &mut canvas, self.status_text())?;
 
         canvas.finish(ctx)
     }
@@ -358,7 +375,7 @@ impl event::EventHandler for GuiState {
     {
         if matches!(button, event::MouseButton::Left) {
             if let Some(game) = self.ongoing() {
-                let clicked_square = util::global_to_board_pos(ctx, (x, y));
+                let clicked_square = util::global_to_board_pos(ctx, (x, y), self.render_flipped());
                 self.handle_board_click(clicked_square);
             }
         }
@@ -369,7 +386,7 @@ impl event::EventHandler for GuiState {
                           _dx: f32, _dy: f32) -> ggez::GameResult
     {
         if self.is_ongoing() {
-            self.hovered_square = util::global_to_board_pos(ctx, (x, y));
+            self.hovered_square = util::global_to_board_pos(ctx, (x, y), self.render_flipped());
         }
         Ok(())
     }

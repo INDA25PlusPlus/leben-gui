@@ -28,11 +28,14 @@ fn global_to_center_pos(ctx: &ggez::Context, pos: (f32, f32)) -> (f32, f32) {
 
 /// returns: A position in screen coordinate space, converted to board coordinate space, if within
 ///          the range -128 to 127 (inclusive)
-pub fn global_to_board_offset_pos(ctx: &ggez::Context, mouse_pos: (f32, f32)) -> Option<(i8, i8)> {
+pub fn global_to_board_offset_pos(ctx: &ggez::Context, mouse_pos: (f32, f32),
+                                  flipped_board: bool) -> Option<(i8, i8)>
+{
     let relative = global_to_center_pos(ctx, mouse_pos);
     let square_size = square_size(ctx);
-    let x = relative.0 / square_size + 4_f32;
-    let y = relative.1 / -square_size + 4_f32;
+    let flip_factor = if flipped_board { -1_f32 } else { 1_f32 };
+    let x = flip_factor * relative.0 / square_size + 4_f32;
+    let y = flip_factor * relative.1 / -square_size + 4_f32;
     let valid_range = -128_f32..=127_f32;
     if valid_range.contains(&x) && valid_range.contains(&y) {
         Some((x.floor() as i8, y.floor() as i8))
@@ -43,8 +46,10 @@ pub fn global_to_board_offset_pos(ctx: &ggez::Context, mouse_pos: (f32, f32)) ->
 
 /// returns: A position in screen coordinate space, converted to board coordinate space and
 ///          converted to a board [Position] if valid
-pub fn global_to_board_pos(ctx: &ggez::Context, pos: (f32, f32)) -> Option<Position> {
-    let relative = global_to_board_offset_pos(ctx, pos)?;
+pub fn global_to_board_pos(ctx: &ggez::Context, pos: (f32, f32),
+                           flipped_board: bool) -> Option<Position>
+{
+    let relative = global_to_board_offset_pos(ctx, pos, flipped_board)?;
     let index_range = 0i8..=7;
     if index_range.contains(&relative.0) && index_range.contains(&relative.1) {
         Position::new(relative.0 as u8, relative.1 as u8)

@@ -66,7 +66,7 @@ fn get_square_render_state(square: Position, piece: Option<Piece>,
 
     if let Some(promotion_type) = promotion_selection
         .map(|promotion_square|
-            gui::util::promotion_selection_type(turn, promotion_square, square))
+        gui::util::promotion_selection_type(turn, promotion_square, square))
         .flatten()
     {
         return SquareDrawState {
@@ -87,37 +87,21 @@ fn get_square_render_state(square: Position, piece: Option<Piece>,
 
     let is_targeted = selected_square.as_ref()
         .is_some_and(|sel|
-            sel.available_moves.contains(&square));
+        sel.available_moves.contains(&square));
 
     return SquareDrawState {
         hovered,
         color: if is_targeted { SquareDrawColor::Targeted } else { SquareDrawColor::Normal },
         piece,
     };
-
-
-    // let mut promotion_selection_iter = turn.map(
-    //     |turn| selected_square.map(
-    //         |selected_square| gui::util::promotion_selection_iter(turn, selected_square.pos)
-    // )).flatten();
-    // let promotion_selection = promotion_selection_iter.map(
-    //     |mut iter| iter.find_map(
-    //         |(pos, piece_type)| (pos == square).then_some(piece_type))
-    // ).flatten()
-    // let is_selected = selected_square.as_ref().is_some_and(|sel| sel.pos == square);
-    // let targeted = selected_square.as_ref()
-    //     .is_some_and(|sel|
-    //         sel.available_moves.contains(&square));
-    // SquareDrawState {
-    //     hovered: hovered_square.is_some_and(|s| s == square),
-    // }
 }
 
 pub fn draw_board(ctx: &mut ggez::Context, canvas: &mut graphics::Canvas,
                   resources: &ImageResources, board: &rsoderh_chess::Board,
                   selected_square: Option<&SquareSelection>,
                   hovered_square: Option<Position>, turn: Option<Color>,
-                  promotion_selection: Option<Position>) -> ggez::GameResult
+                  promotion_selection: Option<Position>,
+                  render_flipped: bool) -> ggez::GameResult
 {
     let square_params = util::square_draw_param(ctx);
     // board border
@@ -127,12 +111,17 @@ pub fn draw_board(ctx: &mut ggez::Context, canvas: &mut graphics::Canvas,
     // board squares
     for i in 0..8_u8 {
         for j in 0..8_u8 {
-            let pos = Position::new(i, j).unwrap();
+            let index = if render_flipped {
+                (7 - i, 7 - j)
+            } else {
+                (i, j)
+            };
+            let pos = Position::from_pair(index).unwrap();
             let piece = board.at_position(pos).as_piece().map(|p| *p);
             let square_render_state = get_square_render_state(
                 pos, piece, selected_square, hovered_square, turn, promotion_selection);
-            draw_board_square(ctx, canvas, square_params, resources, (i, j),
-                              square_render_state)?;
+            draw_board_square(ctx, canvas, square_params, resources, index,
+                              square_render_state, render_flipped)?;
         }
     }
     Ok(())
@@ -140,10 +129,14 @@ pub fn draw_board(ctx: &mut ggez::Context, canvas: &mut graphics::Canvas,
 
 fn draw_board_square(ctx: &mut ggez::Context, canvas: &mut graphics::Canvas,
                      square_params: graphics::DrawParam, resources: &ImageResources,
-                     index: (u8, u8), draw_state: SquareDrawState) -> ggez::GameResult
+                     index: (u8, u8), draw_state: SquareDrawState,
+                     render_flipped: bool) -> ggez::GameResult
 {
-    let x = index.0 as f32 - 4_f32;
-    let y = 3_f32 - index.1 as f32;
+    let (x, y) = if render_flipped {
+        (3_f32 - index.0 as f32, index.1 as f32 - 4_f32)
+    } else {
+        (index.0 as f32 - 4_f32, 3_f32 - index.1 as f32)
+    };
     let is_dark_square = util::is_dark_square(index);
 
     let (square_color, border_color) = colors::square_colors(is_dark_square, draw_state.color);
