@@ -1,4 +1,6 @@
-use rsoderh_chess::{PieceKind, Position};
+use rsoderh_chess::{Board, PieceKind, Position};
+
+mod util;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GameStateType {
@@ -70,6 +72,10 @@ impl<const N: usize> MessageBuilder<N> {
             GameStateType::Draw => b"1-1",
         };
         self.write_slice(state)
+    }
+
+    pub fn write_board(mut self, board: &Board) -> Result<Self, ()> {
+        self.write_slice(&util::board_to_fen(board))
     }
 
     pub fn build(self) -> [u8; N] {
@@ -149,5 +155,10 @@ impl<'a> MessageReader<'a> {
             b"1-1" => Ok(GameStateType::Draw),
             _ => Err(())
         }
+    }
+
+    pub fn read_board_argument(&mut self) -> Result<Board, ()> {
+        let fen = self.read_up_to(b':')?;
+        util::board_from_fen(fen).ok_or(())
     }
 }
