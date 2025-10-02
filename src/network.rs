@@ -10,6 +10,7 @@ pub struct GameConnection {
     connection: TcpStream,
     local_player: Color,
     strict_rule_policy: bool,
+    has_quit: bool,
 }
 
 impl GameConnection {
@@ -18,6 +19,7 @@ impl GameConnection {
             connection,
             local_player,
             strict_rule_policy,
+            has_quit: false,
         }
     }
 
@@ -38,5 +40,9 @@ impl GameConnection {
 
     pub fn strict_rule_policy(&self) -> bool {
         self.strict_rule_policy
+    }
+
+    pub fn quit(&mut self, message: Option<String>) -> Result<(), ()> {
+        self.send_message(Message::ChessQuit { payload: message.unwrap_or(String::new()) })
     }
 }

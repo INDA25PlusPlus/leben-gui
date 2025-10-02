@@ -79,7 +79,7 @@ impl GuiState {
 
     pub fn on_quit(&mut self, message: Option<String>) {
         if let Some(connection) = &mut self.connection {
-            let _ = connection.send_message(Message::ChessQuit { payload: message.unwrap_or(String::new()) });
+            let _ = connection.quit(message);
         }
     }
 
